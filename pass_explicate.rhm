@@ -1,0 +1,41 @@
+#lang rhombus/static
+
+import:
+  "lvar.rhm" open
+  "cvar.rhm" open
+  "pass_rco.rhm" open
+
+export explicate_program
+
+fun explicate_assign(expr :: LvarMExpr,
+                     var :: Symbol,
+                     cont :: CvarBlock) :: CvarBlock:
+  match expr
+  | v :: LvarAtom:
+      [CvarAssign(var, v), &cont]
+  | LvarPrim(op, args):
+      [CvarAssign(var, CvarPrim(op, args)), &cont]
+  | LvarLet(x, e, body):      
+      let new_cont = explicate_assign(body, var, cont)
+      explicate_assign(e, x, new_cont)
+
+fun explicate_tail(expr :: LvarMExpr) :: CvarBlock:
+  match expr
+  | v :: LvarAtom: [CvarReturn(v)]
+  | LvarPrim(op, args):
+      [CvarReturn(CvarPrim(op, args))]
+  | LvarLet(x, e, body):
+      let cont = explicate_tail(body)
+      explicate_assign(e, x, cont)
+
+fun record_vars(section :: CvarBlock) :: Set.of(Symbol):
+  for values(s :: Set = Set{}) (stmt: section):
+    match stmt
+    | CvarAssign(x, _): s ++ {x}
+    | _: s  
+
+fun explicate_program(pgm :: LvarMProgram):
+  let section = explicate_tail(pgm.expr)
+  CvarProgram(pgm.info ++ {#'vars: record_vars(section)},
+              {#'start: section})
+

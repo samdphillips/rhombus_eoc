@@ -1,0 +1,48 @@
+#lang rhombus/static/and_meta
+
+import:
+  "cvar.rhm" open
+  lib("racket/base.rkt"):
+    only read
+    expose read
+
+export interp_cvar_program
+
+fun
+| do_prim(#'#{+}, [a, b]): a + b
+| do_prim(#'#{-}, [a]): - a
+| do_prim(#'#{-}, [a, b]): a - b
+| do_prim(#'read, []): read()
+
+fun interp_cvar_atom(expr :: CvarAtom, binds :: MutableMap):
+  match expr
+  | n :: Int: n
+  | x :: Symbol:
+      match binds[x]
+      | #void: error("unbound var: " +& x)
+      | v: v
+
+fun interp_cvar_expr(expr :: CvarExpr, binds :: MutableMap):
+  match expr
+  | _ :: CvarAtom: interp_cvar_atom(expr, binds)
+  | CvarPrim(op, [arg, ...]):
+      do_prim(op, [interp_cvar_atom(arg, binds), ...])
+
+fun interp_cvar_stmt(stmt :: CvarStmt, binds :: MutableMap):
+  match stmt
+  | CvarAssign(var, expr):
+      binds[var] := interp_cvar_expr(expr, binds)
+
+fun interp_cvar_section(insts :: CvarBlock, binds :: MutableMap):
+  match insts
+  | [CvarReturn(e)]:
+      interp_cvar_expr(e, binds)
+  | [stmt, &cont]:
+      interp_cvar_stmt(stmt, binds)
+      interp_cvar_section(cont, binds)
+
+fun interp_cvar_program(pgm :: CvarProgram, label :: Symbol):
+  def binds = MutableMap{}
+  for (v: (pgm.info[#'vars] :~ Set)):
+      binds[v] := #void
+  interp_cvar_section(pgm.blocks[label], binds)

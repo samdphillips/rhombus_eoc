@@ -1,0 +1,34 @@
+#lang rhombus/static
+
+import:
+  "lvar.rhm" open
+  lib("racket/base.rkt"):
+    only read
+    expose read
+
+fun interp_lvar_expr(e :: LvarExpr, env :: Map.of(Symbol, Int)):
+  match e
+  | n :: Int: n
+  | x :: Symbol: env[x]
+  | LvarLet(x, e, body):
+      let v = interp_lvar_expr(e, env)
+      let new_env = env ++ {x: v}
+      interp_lvar_expr(body, new_env)
+  | LvarPrim(#'read, []):
+      read()
+  | LvarPrim(#'#{+}, [a, b]):
+      let u = interp_lvar_expr(a, env)
+      let v = interp_lvar_expr(b, env)
+      u + v
+  | LvarPrim(#'#{-}, args):
+      match args
+      | [a]:
+          let v = interp_lvar_expr(a, env)
+          0 - v
+      | [a, b]:
+          let u = interp_lvar_expr(a, env)
+          let v = interp_lvar_expr(b, env)
+          u - v
+
+fun interp_lvar_program(p :: LvarProgram):
+  interp_lvar_expr(p.expr, {})

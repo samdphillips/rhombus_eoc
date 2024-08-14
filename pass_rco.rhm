@@ -1,0 +1,44 @@
+#lang rhombus/static/and_meta
+
+import:
+  "lvar.rhm" open
+  lib("racket/base.rkt"):
+    only gensym
+    expose gensym
+
+export rco_program
+
+annot.macro 'Binds':
+  'List.of(Pair.of(Symbol, LvarMExpr))'
+
+fun rco_atom(expr :: LvarExpr) :: values(LvarAtom, Binds):
+  match expr
+  | _ :: LvarAtom:
+      values(expr, [])
+  | _ :: LvarPrim || LvarLet:
+      let b = gensym(#'temp)
+      let e = rco_expr(expr)
+      values(b, [Pair(b, e)])
+
+fun rco_expr(expr :: LvarExpr) :: LvarMExpr:
+  match expr
+  | v :: LvarAtom: v
+  | LvarPrim(op, args):
+      let values(atoms, binds):
+        for values(atoms :~ List = [], binds :: Binds = []):
+          each e: args
+          let values(atom, b) = rco_atom(e)
+          values(atoms.add(atom), b ++ binds)
+      build_let(binds, (expr :~ LvarPrim) with (args = atoms))
+  | LvarLet(_, rhs, body):
+      let new_rhs = rco_expr(rhs)
+      let new_body = rco_expr(body)
+      (expr :~ LvarLet) with (expr = new_rhs, body = new_body)
+
+fun build_let(binds :: Binds, body):
+  for values(body = body):
+    each Pair(var, expr): binds
+    LvarLet(var, expr, body)
+
+fun rco_program(pgm :: LvarProgram) :: LvarMProgram:
+  pgm with (expr = rco_expr(pgm.expr))

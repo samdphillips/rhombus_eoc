@@ -1,0 +1,79 @@
+#lang rhombus/static/and_meta
+
+export:
+  LvarAtom
+  LvarMExpr
+  LvarExpr
+  LvarMProgram
+  LvarProgram
+  LvarPrim
+  LvarLet  
+
+syntax_class PrimOp:
+| '+'
+| '-'
+
+syntax_class PrimFun:
+  fields:
+    name
+    [arg, ...]
+| 'read()':
+    field name: 'read'
+    field [arg, ...]: []
+
+class LvarPrim(op :: Symbol, args :: List):
+  internal _LvarPrim
+  
+  export of
+  annot.macro 'of($atype)':
+    '_LvarPrim.of(Symbol, List.of($atype))'
+
+class LvarLet(var :: Symbol, expr, body):
+  internal _LvarLet
+  export of
+  annot.macro 'of($expr)':
+    '_LvarLet.of(Symbol, $expr, $expr)'
+
+annot.macro 'LvarAtom': 'Int || Symbol'
+
+annot.delayed_declare LvarExpr
+annot.delayed_complete LvarExpr:
+  LvarAtom || LvarPrim.of(LvarExpr) || LvarLet.of(LvarExpr)
+
+annot.delayed_declare LvarMExpr
+annot.delayed_complete LvarMExpr:
+  LvarAtom || LvarPrim.of(LvarAtom) || LvarLet.of(LvarMExpr)
+
+annot.macro 'LvarMProgram':
+  'LvarProgram.of(Map, LvarMExpr)'
+
+class LvarProgram(info :: Map, expr :: LvarExpr):
+  export read
+  
+  fun read(e):
+    read_program(e)
+
+fun read_program(e :: Syntax) :: LvarProgram:
+  LvarProgram({}, read_expr(e))
+
+fun read_expr(e :: Syntax) :: LvarExpr:
+  match e
+  | '$(n :: Int)': n.unwrap()
+  | '$(v :: Identifier)': v.unwrap()
+  | '($e)': read_expr(e)
+  | 'let $(var :: Identifier) = $v ...: $b ...':
+      LvarLet(var.unwrap(), read_expr('$v ...'), read_expr('$b ...'))
+  | '- $a $b':
+      read_expr_cont(LvarPrim('-', [read_expr(a)]), b)
+  | '$a $(op :: PrimOp) $b':
+      read_expr_cont(read_expr(a), '$op $b')
+  | '$(f :: PrimFun)':
+      LvarPrim(f.name.unwrap(), [read_expr(f.arg), ...])
+
+fun read_expr_cont(head :: LvarExpr, rest :: Syntax) :: LvarExpr:
+  match rest
+  | '': head
+  | '$(op :: PrimOp) $(f :: PrimFun) $c':
+      read_expr_cont(LvarPrim(op.unwrap_op(), [head, read_expr(f)]), c)
+  | '$(op :: PrimOp) $b $c':
+      read_expr_cont(LvarPrim(op.unwrap_op(), [head, read_expr(b)]), c)

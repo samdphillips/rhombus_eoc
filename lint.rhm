@@ -1,0 +1,68 @@
+#lang rhombus/static/and_meta
+
+import:
+  lib("racket/base.rkt"):
+    only read
+    expose read
+
+syntax_class PrimOp:
+| '+'
+| '-'
+
+syntax_class PrimFun:
+  fields:
+    name
+    [arg, ...]
+| 'read()':
+    field name: 'read'
+    field [arg, ...]: []
+
+annot.macro 'LintExpr': 'Int || LintPrim'
+
+class LintPrim(op :: Syntax, args :: List.of(LintExpr))
+
+class LintProgram(info :: Map, expr :: LintExpr)
+
+fun read_program(e :: Syntax) :: LintProgram:
+  LintProgram({}, read_expr(e))
+
+fun read_expr(e :: Syntax) :: LintExpr:
+  match e
+  | '$(n :: Int)': n.unwrap()
+  | '($e)': read_expr(e)
+  | '- $a $b':
+      read_expr_cont(LintPrim('-', [read_expr(a)]), b)
+  | '$a $(op :: PrimOp) $b':
+      read_expr_cont(read_expr(a), '$op $b')
+  | '$(f :: PrimFun)':
+      LintPrim(f.name, [read_expr(f.arg), ...])
+
+fun read_expr_cont(head :: LintExpr, rest :: Syntax) :: LintExpr:
+  match rest
+  | '': head
+  | '$(op :: PrimOp) $(f :: PrimFun) $c':
+      read_expr_cont(LintPrim(op, [head, read_expr(f)]), c)
+  | '$(op :: PrimOp) $b $c':
+      read_expr_cont(LintPrim(op, [head, read_expr(b)]), c)
+
+read_program('10 + 32 + read()')
+
+fun interp_expr(e :: LintExpr):
+  match e
+  | n :: Int: n
+  | LintPrim('read', []):
+      read()
+  | LintPrim('-', [a]):
+      let v = interp_expr(a)
+      0 - v
+  | LintPrim('+', [a, b]):
+      let u = interp_expr(a)
+      let v = interp_expr(b)
+      u + v
+  | LintPrim('-', [a, b]):
+      let u = interp_expr(a)
+      let v = interp_expr(b)
+      u - v
+
+fun interp_program(p :: LintProgram):
+  interp_expr(p.expr)

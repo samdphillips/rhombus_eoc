@@ -1,0 +1,25 @@
+#lang rhombus/static/and_meta
+
+export:
+  CvarAtom
+  CvarPrim
+  CvarExpr
+  CvarAssign
+  CvarStmt
+  CvarReturn
+  CvarBlock
+  CvarProgram
+
+annot.macro 'CvarAtom': 'Int || Symbol'
+class CvarPrim(op :: Symbol, args :: List.of(CvarAtom))
+annot.macro 'CvarExpr': 'CvarAtom || CvarPrim'
+
+class CvarAssign(var :: Symbol, expr :: CvarExpr)
+annot.macro 'CvarStmt': 'CvarAssign'
+
+class CvarReturn(expr :: CvarExpr)
+
+annot.macro 'CvarBlock':
+  'matching([_ :: CvarStmt, $('...'), _ :: CvarReturn])'
+
+class CvarProgram(info :: Map, blocks :: Map.of(Symbol, CvarBlock))
