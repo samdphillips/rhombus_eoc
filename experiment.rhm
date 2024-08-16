@@ -1,11 +1,11 @@
 #lang rhombus/static
 
 import:
-  "lvar.rhm" open
+  "lvar.rhm" as Lvar
   "pass_uniquify.rhm" open
   "pass_rco.rhm" open
   "pass_explicate.rhm" open
-  "interp_cvar.rhm" open
+  "interp_cvar.rhm"
 
 fun dbg(v):
   showln(v, ~pretty: #true)
@@ -14,8 +14,8 @@ fun dbg(v):
 'let x = 32:
    let y = 10 + read():
      x + y'
-  |> LvarProgram.read
+  |> Lvar.Program.read
   |> uniquify_program
   |> rco_program
   |> explicate_program |> dbg
-  |> interp_cvar_program(_, #'start)
+  |> interp_cvar.run(_, #'start)

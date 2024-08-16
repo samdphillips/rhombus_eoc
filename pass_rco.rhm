@@ -1,7 +1,7 @@
 #lang rhombus/static/and_meta
 
 import:
-  "lvar.rhm" open
+  "lvar.rhm" as Lvar
   lib("racket/base.rkt"):
     only gensym
     expose gensym
@@ -9,36 +9,36 @@ import:
 export rco_program
 
 annot.macro 'Binds':
-  'List.of(Pair.of(Symbol, LvarMExpr))'
+  'List.of(Pair.of(Symbol, Lvar.M.Expr))'
 
-fun rco_atom(expr :: LvarExpr) :: values(LvarAtom, Binds):
+fun rco_atom(expr :: Lvar.Expr) :: values(Lvar.Atom, Binds):
   match expr
-  | _ :: LvarAtom:
+  | _ :: Lvar.Atom:
       values(expr, [])
-  | _ :: LvarPrim || LvarLet:
+  | _ :: Lvar.Prim || Lvar.Let:
       let b = gensym(#'temp)
       let e = rco_expr(expr)
       values(b, [Pair(b, e)])
 
-fun rco_expr(expr :: LvarExpr) :: LvarMExpr:
+fun rco_expr(expr :: Lvar.Expr) :: Lvar.M.Expr:
   match expr
-  | v :: LvarAtom: v
-  | LvarPrim(op, args):
+  | v :: Lvar.Atom: v
+  | Lvar.Prim(op, args):
       let values(atoms, binds):
         for values(atoms :~ List = [], binds :: Binds = []):
           each e: args
           let values(atom, b) = rco_atom(e)
           values(atoms.add(atom), b ++ binds)
-      build_let(binds, (expr :~ LvarPrim) with (args = atoms))
-  | LvarLet(_, rhs, body):
+      build_let(binds, (expr :~ Lvar.Prim) with (args = atoms))
+  | Lvar.Let(_, rhs, body):
       let new_rhs = rco_expr(rhs)
       let new_body = rco_expr(body)
-      (expr :~ LvarLet) with (expr = new_rhs, body = new_body)
+      (expr :~ Lvar.Let) with (expr = new_rhs, body = new_body)
 
 fun build_let(binds :: Binds, body):
   for values(body = body):
     each Pair(var, expr): binds
-    LvarLet(var, expr, body)
+    Lvar.Let(var, expr, body)
 
-fun rco_program(pgm :: LvarProgram) :: LvarMProgram:
+fun rco_program(pgm :: Lvar.Program) :: Lvar.M.Program:
   pgm with (expr = rco_expr(pgm.expr))
