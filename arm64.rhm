@@ -1,0 +1,46 @@
+#lang rhombus/static/and_meta
+
+export:
+  Reg
+  Imm
+  Deref
+  Instr
+  Call
+  Jmp
+  Ret
+  Block
+  Program
+
+  Var
+
+class Reg(name :: Symbol)
+class Imm(value :: Int)
+class Deref(register :: Reg, offset :: Int)
+
+class Instr(name :: Symbol, arg :: List):
+  export def
+  defn.macro 'def $(name :: Identifier) ($(arg :: bind_meta.Argument), ...)':
+    let [arg_info, ...] = [bind_meta.get_info(arg.parsed, '()'), ...]
+    let ['($_, $a_name, $_, ...)', ...] = [bind_meta.unpack_info(arg_info), ...]
+    'fun $name($arg.parsed, ...) :: Instr:
+       Instr(#'$name, [$a_name, ...])'
+
+class Call(label :: Symbol, nargs :: Int)
+class Jmp(label :: Symbol)
+class Ret()
+
+class Block(info :: Map, instrs :: List.of(Instr))
+class Program(info :: Map, blocks :: Map.of(Symbol, Block))
+
+annot.macro '_Reg': 'Reg'
+
+namespace Var:
+  export all_defined:
+    only_space expr
+  annot.macro 'Dest': '_Reg || Deref || Symbol'
+  annot.macro 'Source': '_Reg || Deref || Imm || Symbol'
+  
+  Instr.def add(dest :: Dest, src1 :: Source, src2 :: Source || Imm)
+  Instr.def subs(dest :: Dest, src1 :: Source, src2 :: Source || Imm)
+  Instr.def neg(dest :: Dest, src :: Source)
+  Instr.def mov(dest :: Dest, src :: Source)
